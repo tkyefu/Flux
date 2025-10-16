@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"flux/database"
 	"flux/handlers"
+	"flux/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,21 +18,29 @@ func SetupRoutes(r *gin.Engine) {
 	// API v1 routes
 	v1 := r.Group("/api/v1")
 	{
+		// Auth routes (public)
+		authHandler := handlers.NewAuthHandler(database.DB)
+		v1.POST("/auth/register", authHandler.Register)
+		v1.POST("/auth/login", authHandler.Login)
+		v1.GET("/auth/me", middleware.AuthMiddleware(), authHandler.GetMe)
+
 		// User-specific tasks (must be before generic user routes to avoid conflicts)
-		v1.GET("/users/:id/tasks", handlers.GetTasksByUser)
+		v1.GET("/users/:id/tasks", middleware.AuthMiddleware(), handlers.GetTasksByUser)
 
 		// User routes
 		users := v1.Group("/users")
+		users.Use(middleware.AuthMiddleware())
 		{
 			users.GET("", handlers.GetUsers)
 			users.GET("/:id", handlers.GetUser)
-			users.POST("", handlers.CreateUser)
+			users.POST("", handlers.CreateUser) // 管理者のみ許可する場合は追加のミドルウェアが必要
 			users.PUT("/:id", handlers.UpdateUser)
 			users.DELETE("/:id", handlers.DeleteUser)
 		}
 
 		// Task routes
 		tasks := v1.Group("/tasks")
+		tasks.Use(middleware.AuthMiddleware())
 		{
 			tasks.GET("", handlers.GetTasks)
 			tasks.GET("/:id", handlers.GetTask)
