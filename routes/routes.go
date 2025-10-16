@@ -23,6 +23,7 @@ func SetupRoutes(r *gin.Engine) {
 		v1.POST("/auth/register", authHandler.Register)
 		v1.POST("/auth/login", authHandler.Login)
 		v1.GET("/auth/me", middleware.AuthMiddleware(), authHandler.GetMe)
+		v1.PUT("/auth/change-password", middleware.AuthMiddleware(), authHandler.ChangePassword)
 
 		// User-specific tasks (must be before generic user routes to avoid conflicts)
 		v1.GET("/users/:id/tasks", middleware.AuthMiddleware(), handlers.GetTasksByUser)
