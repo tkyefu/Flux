@@ -25,7 +25,25 @@ func main() {
 	database.Migrate()
 
 	// Initialize Gin router
-	r := gin.Default()
+	gin.SetMode(gin.DebugMode)
+
+	r := gin.New()
+
+	// Middleware
+	r.Use(gin.Logger())
+	r.Use(gin.Recovery())
+
+	// CORS
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, UPDATE")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
 
 	// Setup routes
 	routes.SetupRoutes(r)
