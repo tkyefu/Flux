@@ -102,7 +102,7 @@ run_tests() {
     
     # 1. パスワードリセットリクエストのテスト
     echo -e "\n--- Testing password reset request ---"
-    send_request "POST" "/api/auth/forgot-password" "{\"email\": \"$TEST_EMAIL\"}" 200
+    send_request "POST" "/api/v1/auth/forgot-password" "{\"email\": \"$TEST_EMAIL\"}" 200
     
     # 2. トークンの取得
     echo -e "\n--- Getting reset token ---"
@@ -118,32 +118,32 @@ run_tests() {
     
     # 3. 有効なトークンでのパスワードリセット
     echo -e "\n--- Testing valid password reset ---"
-    send_request "POST" "/api/auth/reset-password" \
+    send_request "POST" "/api/v1/auth/reset-password" \
         "{\"token\": \"$TOKEN\", \"new_password\": \"$TEST_PASSWORD\", \"confirm_password\": \"$TEST_PASSWORD\"}" 200
     
     # 4. パスワードの複雑性チェック（先に実施してレート制限を回避）
     echo -e "\n--- Testing password complexity (should fail) ---"
-    send_request "POST" "/api/auth/forgot-password" "{\"email\": \"$TEST_EMAIL\"}" 200
+    send_request "POST" "/api/v1/auth/forgot-password" "{\"email\": \"$TEST_EMAIL\"}" 200
     # 新しいトークンを取得（複雑性テスト用）
     TOKEN=$(psql $PSQLOPTS -U $DB_USER -d $DB_NAME -t -c "$TOKEN_QUERY" | tr -d '[:space:]')
-    send_request "POST" "/api/auth/reset-password" \
+    send_request "POST" "/api/v1/auth/reset-password" \
         "{\"token\": \"$TOKEN\", \"new_password\": \"simple\", \"confirm_password\": \"simple\"}" 400
 
     # 5. 同じトークンでの再試行（失敗するはず） - 最初のトークンを再利用
     echo -e "\n--- Testing reused token (should fail) ---"
-    send_request "POST" "/api/auth/reset-password" \
+    send_request "POST" "/api/v1/auth/reset-password" \
         "{\"token\": \"$FIRST_TOKEN\", \"new_password\": \"NewPassword123!\", \"confirm_password\": \"NewPassword123!\"}" 400
 
     # 6. 無効なトークンでのテスト
     echo -e "\n--- Testing invalid token (should fail) ---"
-    send_request "POST" "/api/auth/reset-password" \
+    send_request "POST" "/api/v1/auth/reset-password" \
         "{\"token\": \"invalid-token-123\", \"new_password\": \"NewPassword123!\", \"confirm_password\": \"NewPassword123!\"}" 400
     
     # 7. 期限切れトークンでのテスト
     echo -e "\n--- Testing expired token (should fail) ---"
     EXPIRED_TOKEN=$(openssl rand -hex 16)
     psql $PSQLOPTS -U $DB_USER -d $DB_NAME -c "INSERT INTO password_resets (user_id, token, used, expires_at, created_at, updated_at) VALUES ((SELECT id FROM users WHERE email = '$TEST_EMAIL'), '$EXPIRED_TOKEN', false, NOW() - INTERVAL '1 minute', NOW(), NOW());"
-    send_request "POST" "/api/auth/reset-password" \
+    send_request "POST" "/api/v1/auth/reset-password" \
         "{\"token\": \"$EXPIRED_TOKEN\", \"new_password\": \"NewPassword123!\", \"confirm_password\": \"NewPassword123!\"}" 400
     
     # 8. レートリミットのテスト（環境変数に応じて動的に検証）
@@ -153,7 +153,7 @@ run_tests() {
     rl_429=0
     echo "Configured RATE_LIMIT_REQUESTS=$LIMIT"
     for i in $(seq 1 $ATTEMPTS); do
-        code=$(send_request_status "POST" "/api/auth/forgot-password" "{\"email\": \"$TEST_EMAIL\"}")
+        code=$(send_request_status "POST" "/api/v1/auth/forgot-password" "{\"email\": \"$TEST_EMAIL\"}")
         echo "Request $i/$ATTEMPTS -> HTTP $code"
         if [ "$code" -eq 429 ]; then rl_429=1; fi
     done
