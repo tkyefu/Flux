@@ -1,6 +1,8 @@
 package middleware
 
 import (
+    "os"
+    "strconv"
     "net/http"
     "sync"
     "time"
@@ -21,13 +23,37 @@ func init() {
     go cleanupVisitors()
 }
 
+func getEnvInt(name string, def int) int {
+    if v := os.Getenv(name); v != "" {
+        if i, err := strconv.Atoi(v); err == nil && i > 0 {
+            return i
+        }
+    }
+    return def
+}
+
+func getEnvDuration(name string, def time.Duration) time.Duration {
+    if v := os.Getenv(name); v != "" {
+        if d, err := time.ParseDuration(v); err == nil && d > 0 {
+            return d
+        }
+    }
+    return def
+}
+
 func getVisitor(ip string) *rate.Limiter {
     mu.Lock()
     defer mu.Unlock()
 
     v, exists := visitors[ip]
     if !exists {
-        limiter := rate.NewLimiter(rate.Every(1*time.Minute), 5) // 1分間に5リクエストまで
+        requests := getEnvInt("RATE_LIMIT_REQUESTS", 5)
+        window := getEnvDuration("RATE_LIMIT_WINDOW", time.Minute)
+        per := window / time.Duration(requests)
+        if per <= 0 {
+            per = time.Minute / 5
+        }
+        limiter := rate.NewLimiter(rate.Every(per), requests)
         visitors[ip] = &visitor{limiter, time.Now()}
         return limiter
     }

@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"os"
+	"strconv"
 	"errors"
 	"strings"
 	"unicode"
@@ -29,7 +31,8 @@ var commonPasswords = map[string]bool{
 
 // ValidatePassword はパスワードがポリシーを満たしているか検証します
 func ValidatePassword(password, email string) error {
-	if len(password) < 8 {
+	minLen := getEnvInt("PASSWORD_MIN_LENGTH", 8)
+	if len(password) < minLen {
 		return ErrPasswordTooShort
 	}
 
@@ -41,7 +44,18 @@ func ValidatePassword(password, email string) error {
 		return ErrPasswordContainsEmail
 	}
 
-	if !meetsComplexityRequirements(password) {
+	reqUpper := getEnvBool("PASSWORD_REQUIRE_UPPER", false)
+	reqLower := getEnvBool("PASSWORD_REQUIRE_LOWER", false)
+	reqNumber := getEnvBool("PASSWORD_REQUIRE_NUMBER", false)
+	reqSpecial := getEnvBool("PASSWORD_REQUIRE_SPECIAL", false)
+
+	if reqUpper || reqLower || reqNumber || reqSpecial {
+		hasUpper, hasLower, hasNumber, hasSpecial := classify(password)
+		if reqUpper && !hasUpper { return ErrPasswordWeak }
+		if reqLower && !hasLower { return ErrPasswordWeak }
+		if reqNumber && !hasNumber { return ErrPasswordWeak }
+		if reqSpecial && !hasSpecial { return ErrPasswordWeak }
+	} else if !meetsComplexityRequirements(password) {
 		return ErrPasswordWeak
 	}
 
@@ -94,4 +108,39 @@ func meetsComplexityRequirements(password string) bool {
 	}
 
 	return false
+}
+
+func classify(password string) (bool, bool, bool, bool) {
+	var hasUpper, hasLower, hasNumber, hasSpecial bool
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsNumber(char):
+			hasNumber = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+	return hasUpper, hasLower, hasNumber, hasSpecial
+}
+
+func getEnvInt(name string, def int) int {
+	if v := os.Getenv(name); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			return i
+		}
+	}
+	return def
+}
+
+func getEnvBool(name string, def bool) bool {
+	if v := os.Getenv(name); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return def
 }
