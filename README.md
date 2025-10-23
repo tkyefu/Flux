@@ -38,6 +38,13 @@ A modern task management API built with Go, Gin, and PostgreSQL.
 ### Health Check
 - `GET /health` - Health check endpoint
 
+### Auth
+- `POST /api/v1/auth/register` - Register a new user
+- `POST /api/v1/auth/login` - Login and receive a JWT
+- `GET /api/v1/auth/me` - Get current user info (requires Authorization: Bearer <token>)
+- `POST /api/v1/auth/forgot-password` - Request password reset
+- `POST /api/v1/auth/reset-password` - Reset password with token
+
 ### Users
 - `GET /api/v1/users` - Get all users
 - `GET /api/v1/users/:id` - Get a specific user
@@ -48,9 +55,9 @@ A modern task management API built with Go, Gin, and PostgreSQL.
 ### Tasks
 - `GET /api/v1/tasks` - Get all tasks
 - `GET /api/v1/tasks/:id` - Get a specific task
-- `POST /api/v1/tasks` - Create a new task
-- `PUT /api/v1/tasks/:id` - Update a task
-- `DELETE /api/v1/tasks/:id` - Delete a task
+- `POST /api/v1/tasks` - Create a new task (requires auth)
+- `PUT /api/v1/tasks/:id` - Update a task (requires auth)
+- `DELETE /api/v1/tasks/:id` - Delete a task (requires auth)
 - `GET /api/v1/users/:id/tasks` - Get all tasks for a specific user
 
 ## Development
@@ -72,12 +79,40 @@ A modern task management API built with Go, Gin, and PostgreSQL.
 Create a `.env` file in the root directory with the following variables:
 
 ```
+# Server
+PORT=8080
+APP_ENV=development
+
+# Database (prefer DATABASE_URL; the following fields are optional fallbacks)
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
 DB_HOST=localhost
 DB_USER=postgres
 DB_PASSWORD=postgres
 DB_NAME=taskdb
 DB_PORT=5432
-PORT=8080
+
+# Auth / JWT
+JWT_SECRET=your-secure-jwt-secret
+
+# Rate Limiting
+RATE_LIMIT_REQUESTS=5
+RATE_LIMIT_WINDOW=1m
+
+# Password Policy (optional)
+PASSWORD_MIN_LENGTH=8
+PASSWORD_REQUIRE_UPPER=false
+PASSWORD_REQUIRE_LOWER=false
+PASSWORD_REQUIRE_NUMBER=false
+PASSWORD_REQUIRE_SPECIAL=false
+
+# Frontend URL (used in password reset link)
+FRONTEND_URL=http://localhost:3000
+
+# SMTP (production only)
+SMTP_FROM=you@example.com
+SMTP_PASSWORD=your-app-password
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
 ```
 
 ## Project Structure
