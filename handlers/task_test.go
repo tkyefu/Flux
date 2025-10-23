@@ -32,6 +32,8 @@ func TestCreateAndGetTask(t *testing.T) {
     // create task
     body := models.Task{Title: "T", Description: "D", Status: "pending", UserID: u.ID}
     w, c := performJSONRequest(CreateTask, http.MethodPost, body)
+    // 認証ユーザーをコンテキストに設定
+    c.Set("user_id", u.ID)
     CreateTask(c)
     if w.Code != http.StatusCreated { t.Fatalf("expected 201, got %d", w.Code) }
 
@@ -78,18 +80,24 @@ func TestUpdateAndDeleteTask(t *testing.T) {
     upd := models.Task{Title: "New"}
     w, c := performJSONRequest(UpdateTask, http.MethodPut, upd)
     c.Params = []gin.Param{{Key: "id", Value: strconv.Itoa(int(task.ID))}}
+    // 認証ユーザーをコンテキストに設定
+    c.Set("user_id", u.ID)
     UpdateTask(c)
     if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w.Code) }
 
     // delete
     w2, c2 := performJSONRequest(DeleteTask, http.MethodDelete, nil)
     c2.Params = []gin.Param{{Key: "id", Value: strconv.Itoa(int(task.ID))}}
+    // 認証ユーザーをコンテキストに設定
+    c2.Set("user_id", u.ID)
     DeleteTask(c2)
     if w2.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w2.Code) }
 
     // delete not found
     w3, c3 := performJSONRequest(DeleteTask, http.MethodDelete, nil)
     c3.Params = []gin.Param{{Key: "id", Value: strconv.Itoa(int(task.ID))}}
+    // 認証ユーザーをコンテキストに設定
+    c3.Set("user_id", u.ID)
     DeleteTask(c3)
     if w3.Code != http.StatusNotFound { t.Fatalf("expected 404, got %d", w3.Code) }
 }
