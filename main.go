@@ -32,7 +32,7 @@ func main() {
 
     // マイグレーション
     if len(os.Args) > 1 && os.Args[1] == "migrate" {
-        if err := db.AutoMigrate(&models.User{}, &models.PasswordReset{}); err != nil {
+        if err := db.AutoMigrate(&models.User{}, &models.Task{}, &models.PasswordReset{}); err != nil {
             log.Fatalf("Failed to migrate database: %v", err)
         }
         log.Println("Migration completed successfully")
