@@ -6,6 +6,8 @@ import (
 
     "flux/config"
     "flux/database"
+    "flux/mailer"
+    "flux/middleware"
     "flux/models"
     "flux/routes"
 
@@ -20,7 +22,7 @@ func main() {
     }
 
     // 設定の読み込み
-    cfg := config.Load()
+    _ = config.Load()
 
     // データベース接続
     db, err := database.Connect()
@@ -39,13 +41,31 @@ func main() {
 
     // ルーターの設定
     r := gin.Default()
-    routes.SetupRoutes(r, db, cfg.Mailer)
+
+    // レートリミットミドルウェアを追加
+    r.Use(middleware.RateLimit())
+
+	// メーラーの初期化
+	var mailerInstance mailer.Mailer
+	if os.Getenv("ENV") == "production" {
+		mailerInstance = mailer.NewProdMailer(
+			os.Getenv("SMTP_FROM"),
+			os.Getenv("SMTP_PASSWORD"),
+			os.Getenv("SMTP_HOST"),
+			os.Getenv("SMTP_PORT"),
+		)
+	} else {
+		mailerInstance = mailer.NewDevMailer()
+	}
+
+	// ルートの設定
+	routes.SetupRoutes(r, db, mailerInstance)
 
     // サーバー起動
     port := os.Getenv("PORT")
     if port == "" {
         port = "8080"
     }
-    log.Printf("Server starting on port %s in %s mode\n", port, cfg.Env)
+    log.Printf("Server starting on port %s", port)
     log.Fatal(r.Run(":" + port))
 }

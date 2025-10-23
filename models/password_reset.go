@@ -6,12 +6,13 @@ import (
 )
 
 type PasswordReset struct {
-    ID        uint      `gorm:"primaryKey" json:"id"`
-    UserID    uint      `gorm:"not null" json:"user_id"`
-    Token     string    `gorm:"size:255;not null;uniqueIndex" json:"token"`
-    ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
-    CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
-    UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+    ID        uint      `gorm:"primaryKey"`
+    UserID    uint      `gorm:"not null"`
+    Token     string    `gorm:"uniqueIndex;not null"`
+    Used      bool      `gorm:"default:false"`
+    ExpiresAt time.Time `gorm:"not null"`
+    CreatedAt time.Time
+    UpdatedAt time.Time
     
     User      User      `gorm:"foreignKey:UserID" json:"-"`
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
     "net/http"
     "time"
 
@@ -84,11 +85,35 @@ func (h *PasswordResetHandler) ResetPassword(c *gin.Context) {
 
     // トークンを検証
     var resetToken models.PasswordReset
-    if err := h.DB.Where("token = ? AND expires_at > ?", input.Token, time.Now()).
-        First(&resetToken).Error; err != nil {
+    if err := h.DB.Where("token = ?", input.Token).First(&resetToken).Error; err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "無効または期限切れのトークンです"})
         return
     }
+
+    // トークンの有効期限チェック
+    if time.Now().After(resetToken.ExpiresAt) {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "トークンの有効期限が切れています"})
+        return
+    }
+
+    // トークンの使用済みチェック
+    if resetToken.Used {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "このトークンは既に使用されています"})
+        return
+    }
+
+	// ユーザーを取得
+	var user models.User
+	if err := h.DB.First(&user, resetToken.UserID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザーが見つかりません"})
+		return
+	}
+
+	// パスワードの複雑性チェック
+	if err := utils.ValidatePassword(input.NewPassword, user.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
     // パスワードをハッシュ化
     hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
@@ -97,15 +122,37 @@ func (h *PasswordResetHandler) ResetPassword(c *gin.Context) {
         return
     }
 
+    // トランザクション開始
+    tx := h.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
     // ユーザーのパスワードを更新
-    if err := h.DB.Model(&models.User{}).Where("id = ?", resetToken.UserID).
+    if err := tx.Model(&models.User{}).Where("id = ?", resetToken.UserID).
         Update("password", string(hashedPassword)).Error; err != nil {
+        tx.Rollback()
         c.JSON(http.StatusInternalServerError, gin.H{"error": "パスワードの更新に失敗しました"})
         return
     }
 
-    // 使用済みトークンを削除
-    h.DB.Delete(&resetToken)
+    // トークンを使用済みに更新
+    if err := tx.Model(&resetToken).Update("used", true).Error; err != nil {
+        tx.Rollback()
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "トークンの更新に失敗しました"})
+        return
+    }
+
+    // トランザクション確定
+    if err := tx.Commit().Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "処理中にエラーが発生しました"})
+        return
+    }
+
+    // ログ記録
+    log.Printf("Password reset successful for user ID: %d", resetToken.UserID)
 
     c.JSON(http.StatusOK, gin.H{"message": "パスワードが正常にリセットされました"})
 }
